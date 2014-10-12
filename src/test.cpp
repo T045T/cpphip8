@@ -56,8 +56,8 @@ int main(int argc, char** argv)
       // Draw screen
       SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 0xFF);
 
-      int pixel_width = round(xRes / (float) emu.getXRes());
-      int pixel_height = round(yRes / (float) emu.getYRes());
+      int pixel_width = (xRes / (float) emu.getXRes());
+      int pixel_height = (yRes / (float) emu.getYRes());
 
       SDL_Rect pixel = {0, 0, pixel_width, pixel_height};
       for (size_t x = 0; x < emu.getXRes(); x++)
