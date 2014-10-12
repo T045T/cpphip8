@@ -3,7 +3,7 @@ cpphip8
 
 The customary emulator writing rite of passage, apparently. Chip-8 emulator in C++ with SDL
 
-* Building
+## Building
 Standard cmake procedure:
 ```
 mkdir build
@@ -14,7 +14,7 @@ make
 
 And Bob's your uncle!
 
-* Controls:
+## Controls
 Keypad is emulated like this:
 ```
 Chip8     => QWERTZ
