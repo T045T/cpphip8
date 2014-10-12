@@ -6,6 +6,38 @@ namespace cpphip8
 {
 Keyboard::Keyboard()
 {
-  // Lololol
+  for(size_t i = 0; i < 16; i++)
+  {
+    keys[i] = false;
+  }
+  mythread = std::thread(&Keyboard::inputLoop, this);
 }
+
+Keyboard::~Keyboard()
+{
+  {
+    std::lock_guard<std::mutex> lock(m);
+    alive = false;
+  }
+  mythread.join();
+}
+
+bool Keyboard::pollKey(uint8_t key)
+{
+  std::lock_guard<std::mutex> lock(m);
+  return keys[key];
+}
+
+void Keyboard::inputLoop()
+{
+  while(alive)
+  {
+    std::lock_guard<std::mutex> lock(m);
+    for(size_t i = 0; i < 16; i++)
+    {
+      
+    }
+  }
+}
+
 }

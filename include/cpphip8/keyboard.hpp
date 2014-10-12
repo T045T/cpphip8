@@ -1,6 +1,8 @@
 #ifndef CPPHIP8_KEYBOARD
 #define CPPHIP8_KEYBOARD
 #include <cstdint>
+#include <thread>
+#include <mutex>
 
 namespace cpphip8
 {
@@ -24,10 +26,21 @@ public:
    * Dummy implementation for now. Keys are never pressed. They cannot be pressed.
    * Because they don't exist
    */
-  inline bool pollKey(uint8_t)
-  {
-    return false;
-  }
+  ~Keyboard();
+  
+  /**
+   * Returns true if the given key is currently pressed
+   * @param key the key to query. Expected to be between 0x0 and 0xF
+   */
+  bool pollKey(uint8_t key);
+protected:
+  std::thread mythread;
+  std::mutex m;
+  void inputLoop();
+
+  bool alive;
+  bool keys[16];
+  char keymap[16];
 };
 }
 #endif

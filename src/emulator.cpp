@@ -1,6 +1,9 @@
-// this is for emacs file handling -*- mode: c++; flycheck-clang-standard-library: "libc++"; flycheck-clang-language-standard: "c++11"; flycheck-clang-include-path: ("../include"); indent-tabs-mode: nil -*-
+// this is for emacs file handling -*- mode: c++; flycheck-clang-standard-library: "libc++"; flycheck-clang-language-standard: "c++11"; flycheck-clang-include-path: ("../include" "/usr/local/include/SDL2"); indent-tabs-mode: nil -*-
 
 #include "cpphip8/emulator.hpp"
+#include <chrono>
+#include <cstring>
+#include <thread>
 #include <fstream>
 #include <iostream>
 #include <iomanip>
@@ -15,44 +18,73 @@ Emulator::Emulator() :
   BEEP(false),
   highres(false),
   random_generator(),
-  dist(0, 255)
+  dist(0, 255),
+  screenUpdate(false),
+  soundRequest(false),
+  keys()
 {
+  memset(memory, 0, 4096);
   ClearScreen();
   setupFonts();
-}
-
-void Emulator::DisplaySprite(nibble_t x, nibble_t y, nibble_t height)
-{
-  byte_t xPos = registers[x];
-  byte_t xOffset = xPos % 8;
-  xPos /= 8;
-  byte_t yPos = registers[y];
-  bool killedPixel = false;
-
-  // Special SUPER case for Extended Sprite (16x16)
-  if (height == 0)
-  {
-    for (byte_t yOffset = 0; yOffset < 16; yOffset++)
-    {
-        
-    }
-  }
-  else
-  {
-    
-  }
-  std::cout << "SPRITE! (" << (unsigned int) xPos << ", " << (unsigned int) yPos << "), height: " << (unsigned int) height << std::endl;
 }
 
 void Emulator::startEmulation()
 {
   PC = PROGRAM_START;
-  while(PC < 4096)
+  alive = true;
+  t = std::thread(&Emulator::mainLoop, this);
+}
+
+void Emulator::stopEmulation()
+{
+  {
+    std::lock_guard<std::mutex> lock(m);
+    alive = false;
+  }
+  t.join();
+}
+
+void Emulator::keyDown(uint8_t key)
+{
+  // std::cout << "[Backend] Key Down: " << (int) key << std::endl;
+  std::lock_guard<std::mutex> lock(m);
+  keys[key] = true;
+}
+
+void Emulator::keyUp(uint8_t key)
+{
+  // std::cout << "[Backend] Key Up: " << (int) key << std::endl;
+  std::lock_guard<std::mutex> lock(m);
+  keys[key] = false;
+}
+
+void Emulator::mainLoop()
+{
+  unsigned int counter = 0;
+  while (alive)
   {
     decode(readOpcode(PC));
+    counter++;
     // Increment PC
     PC+= 2;
-    // TODO(nberg): Also decrement Timers and shit
+    if (PC >= 4096)
+    {
+      alive = false;
+      break;
+    }
+    // TODO(nberg): Also increment Timers and shit
+    if (counter % 10 == 0)
+    {
+      std::this_thread::sleep_for(std::chrono::milliseconds(15));
+      if (delayTimer > 0)
+      {
+        delayTimer--;
+      }
+      if (soundTimer > 0)
+      {
+        soundTimer--;
+      }
+    }
   }
 }
 
@@ -68,6 +100,67 @@ void Emulator::loadRom(std::string path)
     INDEX += 2;
   }
   INDEX = 0;
+}
+
+
+void Emulator::DisplaySprite(nibble_t x, nibble_t y, nibble_t height)
+{
+  uint8_t currentYRes = highres ? 64 : 32;
+  uint8_t currentXRes = highres ? 128 : 64;
+  byte_t xPos = registers[x];
+  byte_t xOffset = xPos % 8;
+  xPos /= 8;
+  byte_t yPos = registers[y] % currentYRes;
+
+  // Special SUPER case for Extended Sprite (16x16)
+  if (height == 0)
+  {
+    for (byte_t yOffset = 0; yOffset < 16; yOffset++)
+    {
+        
+    }
+  }
+  else
+  {
+    byte_t left_byte;
+    byte_t right_byte;
+    byte_t right_xPos = (xPos + 1) % (currentXRes / 8);
+    for (byte_t yOffset = 0; yOffset < height; yOffset++)
+    {
+      left_byte = memory[INDEX + yOffset] >> xOffset;
+      // if xOffset == 0, right_byte ends up empty and doesn't affect anything in the XOR
+      right_byte = memory[INDEX + yOffset] << (8 - xOffset);
+      byte_t tmp_left = frameBuffer[xPos][(yPos + yOffset) % currentYRes];
+      frameBuffer[xPos][(yPos + yOffset) % currentYRes] ^= left_byte;
+      byte_t tmp_right = frameBuffer[right_xPos][(yPos + yOffset) % currentYRes];
+      frameBuffer[right_xPos][(yPos + yOffset) % currentYRes] ^= right_byte;
+      if ( tmp_left & left_byte || tmp_right & right_byte)
+      {
+        //std::cout << "Collision" << std::endl;
+        registers[RegisterNames::VF] = 1;
+      }
+      else
+      {
+        //std::cout << "NO Collision" << std::endl;
+        registers[RegisterNames::VF] = 0;
+      }
+    }
+  }
+//  std::cout << "SPRITE! (" << (unsigned int) xPos << ", " << (unsigned int) yPos << "), height: " << (unsigned int) height << std::endl;
+  std::lock_guard<std::mutex> lock(m);
+  screenUpdate = true;
+}
+
+bool Emulator::getPixel(unsigned int x, unsigned int y)
+{
+  // Pixels outside of the screen are always off
+  if (x > getXRes() || y > getYRes())
+  {
+    return false;
+  }
+
+  std::bitset<8> bs(frameBuffer[x/8][y]);
+  return bs[7-(x % 8)];
 }
 
 void Emulator::ScrollDown(nibble_t x)
@@ -87,7 +180,11 @@ void Emulator::ScrollLeft()
 
 void Emulator::WaitForKey(nibble_t index)
 {
-
+  std::unique_lock<std::mutex> lock(m);
+  while(keys[registers[index]])
+  {
+    cv.wait(lock);
+  }
 }
 
 void Emulator::decode(opcode_t opcode)
@@ -102,7 +199,7 @@ void Emulator::decode(opcode_t opcode)
   byte_t lowByte = opcode & 0xFF;
   address_t address = opcode & 0xFFF;
 
-  //std::cout << std::hex << PC << ": " << opcode << std::endl;
+//  std::cout << std::hex << PC << ": " << opcode << std::endl;
 
   if ((opcode & OpCodeMasks::ScrollDown) == OpCodes::ScrollDown)
   {
@@ -146,11 +243,11 @@ void Emulator::decode(opcode_t opcode)
   }
   else if ((opcode & OpCodeMasks::SkipEqualImmediate) == OpCodes::SkipEqualImmediate)
   {
-    SkipEqualImmediate(nibbles[2], lowByte);
+    SkipEqualImmediate(nibbles[1], lowByte);
   }
   else if ((opcode & OpCodeMasks::SkipNotEqualImmediate) == OpCodes::SkipNotEqualImmediate)
   {
-    SkipNotEqualImmediate(nibbles[2], lowByte);
+    SkipNotEqualImmediate(nibbles[1], lowByte);
   }
   else if ((opcode & OpCodeMasks::SkipEqualRegister) == OpCodes::SkipEqualRegister)
   {
@@ -222,10 +319,12 @@ void Emulator::decode(opcode_t opcode)
   }
   else if ((opcode & OpCodeMasks::SkipIfKey) == OpCodes::SkipIfKey)
   {
+//    std::cout << "hi" << std::endl;
     SkipIfKey(nibbles[1]);
   }
   else if ((opcode & OpCodeMasks::SkipIfNotKey) == OpCodes::SkipIfNotKey)
   {
+//    std::cout << "hey! hello!" << std::endl;
     SkipIfNotKey(nibbles[1]);
   }
   else if ((opcode & OpCodeMasks::LoadDelayTimer) == OpCodes::LoadDelayTimer)
@@ -270,5 +369,104 @@ void Emulator::decode(opcode_t opcode)
   }
 }
 
+const Emulator::byte_t Emulator::smallFont[16*5] = 
+    {
+      // 0
+      0b11110000,
+      0b10010000,
+      0b10010000,
+      0b10010000,
+      0b11110000,
+      // 1
+      0b00100000,
+      0b01100000,
+      0b00100000,
+      0b00100000,
+      0b01110000,
+      // 2
+      0b11110000,
+      0b00010000,
+      0b11110000,
+      0b10000000,
+      0b11110000,
+      // 3
+      0b11110000,
+      0b00010000,
+      0b11110000,
+      0b00010000,
+      0b11110000,
+      // 4
+      0b10010000,
+      0b10010000,
+      0b11110000,
+      0b00010000,
+      0b00010000,
+      // 5
+      0b11110000,
+      0b10000000,
+      0b11110000,
+      0b00010000,
+      0b11110000,
+      // 6
+      0b11110000,
+      0b10000000,
+      0b11110000,
+      0b10010000,
+      0b11110000,
+      // 7
+      0b11110000,
+      0b00010000,
+      0b00100000,
+      0b01000000,
+      0b01000000,
+      // 8
+      0b11110000,
+      0b10010000,
+      0b11110000,
+      0b10010000,
+      0b11110000,
+      // 9
+      0b11110000,
+      0b10010000,
+      0b11110000,
+      0b00010000,
+      0b11110000,
+      // A
+      0b11110000,
+      0b10010000,
+      0b11110000,
+      0b10010000,
+      0b10010000,
+      // B
+      0b11100000,
+      0b10010000,
+      0b11100000,
+      0b10010000,
+      0b11100000,
+      // C
+      0b11110000,
+      0b10000000,
+      0b10000000,
+      0b10000000,
+      0b11110000,
+      // D
+      0b11100000,
+      0b10010000,
+      0b10010000,
+      0b10010000,
+      0b11100000,
+      // E
+      0b11110000,
+      0b10000000,
+      0b11110000,
+      0b10000000,
+      0b11110000,
+      // F
+      0b11110000,
+      0b10000000,
+      0b11110000,
+      0b10000000,
+      0b10000000
+    };
 }
 

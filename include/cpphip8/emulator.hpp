@@ -1,4 +1,4 @@
-// this is for emacs file handling -*- mode: c++; flycheck-clang-standard-library: "libc++"; flycheck-clang-language-standard: "c++11"; indent-tabs-mode: nil -*-
+// this is for emacs file handling -*- mode: c++; flycheck-clang-standard-library: "libc++"; flycheck-clang-language-standard: "c++11"; flycheck-clang-include-path: (".." "/usr/local/include/SDL2"); indent-tabs-mode: nil -*-
 
 #ifndef CPPHIP8_EMULATOR
 #define CPPHIP8_EMULATOR
@@ -6,9 +6,12 @@
 #include <cstddef>
 #include <cassert>
 #include <random>
+#include <array>
 
 #include <iostream>
 #include <iomanip>
+
+#include "SDL.h"
 
 #include "cpphip8/keyboard.hpp"
 #include "cpphip8/screen.hpp"
@@ -18,13 +21,94 @@ namespace cpphip8
   class Emulator
   {
   public:
+    typedef std::array<std::array<uint8_t, 64>, 128/8> screen_buffer_t;
     typedef uint16_t opcode_t;
     typedef uint16_t address_t;
 
     Emulator();
     void startEmulation();
+    void stopEmulation();
     void decode(opcode_t opcode);
     void loadRom(std::string path);
+
+    inline bool isRunning()
+    {
+      return alive;
+    }
+
+    inline unsigned int getXRes()
+    {
+      if (highres)
+      {
+        return 128;
+      }
+      else
+      {
+        return 64;
+      }
+    }
+
+    inline unsigned int getYRes()
+    {
+      if (highres)
+      {
+        return 64;
+      }
+      else
+      {
+        return 32;
+      }
+    }
+
+    // IO related stuff
+
+    bool getPixel(unsigned int x, unsigned int y);
+    inline screen_buffer_t getFramebuffer()
+    {
+      return frameBuffer;
+    }
+
+    /**
+     * Was a screen update requested?
+     * If so, return true and clear the screen update flag;
+     */
+    inline bool updateRequested()
+    {
+      if (screenUpdate)
+      {
+        std::lock_guard<std::mutex> lock(m);
+        screenUpdate = false;
+        return true;
+      }
+      else
+      {
+        return false;
+      }
+    }
+    
+    /**
+     * Was a beep requested?
+     * If so, return true and clear the screen update flag;
+     */
+    inline bool soundRequested()
+    {
+      if (soundRequest)
+      {
+        std::lock_guard<std::mutex> lock(m);
+        soundRequest = false;
+        return true;
+      }
+      else
+      {
+        return false;
+      }
+    }
+
+    // Keyboard
+    //! Notify the emulator of a pressed key
+    void keyDown(uint8_t key);
+    //! Notify the emulator of a released key
+    void keyUp(uint8_t key);
 
     /**
      * I know, I KNOW. A nibble is supposed to have 4 bytes, but there's no uint4_t...
@@ -173,17 +257,34 @@ namespace cpphip8
     uint8_t SP;
     bool BEEP;
     bool highres;
-    uint8_t frameBuffer[128/8][64];
+    screen_buffer_t frameBuffer;
     std::default_random_engine random_generator;
     std::uniform_int_distribution<uint8_t> dist;
 
-    // Simulated Hardware
-    Keyboard keyboard;
-    Screen screen;
+    // Thread stuff
+    std::mutex m;
+    std::condition_variable cv;
+    std::thread t;
+    bool alive;
+
+    // Hardware stuff
+    //! Set whenever a sprite is drawn or the screen is cleared
+    bool screenUpdate;
+    //! Set whenever the sound timer hits 0
+    bool soundRequest;
+    bool keys[16];
+
+    void mainLoop();
 
     //! Copy the Font data into memory
     void setupFonts()
-    {}
+    {
+      // 16 Characters * 5 lines
+      for (size_t i = 0; i < 16*5; i++)
+      {
+        memory[i] = smallFont[i];
+      }
+    }
 
     opcode_t readOpcode(uint16_t address)
     {
@@ -193,7 +294,9 @@ namespace cpphip8
       return ret;
     }
 
-
+    
+    // Opcodes:
+    
     /**
      * Execute native CPU code from address target
      * NOT gonna implement that shit. Nope. Nopenopenope.
@@ -220,6 +323,8 @@ namespace cpphip8
           frameBuffer[x][y] = 0;
         }
       }
+      std::lock_guard<std::mutex> lock(m);
+      screenUpdate = true;
     }
 
     /**
@@ -268,7 +373,7 @@ namespace cpphip8
      */
     inline void Jump(address_t target)
     {
-      // Set PC to target - 1 because it's increased at the end of the main loop
+      // Set PC to target - 2 because it's increased at the end of the main loop
       PC = target - 2;
     }
 
@@ -291,8 +396,10 @@ namespace cpphip8
      */
     inline void SkipEqualImmediate(nibble_t index, byte_t constant)
     {
+      //std::cout << "comparing " << (int) registers[index] << " to " << (int) constant << std::endl;
       if (registers[index] == constant)
       {
+        //std::cout << "JUMP" << std::endl;
         PC+= 2;
       }
     }
@@ -445,23 +552,25 @@ namespace cpphip8
      * @param height height of the sprite - this many 8 bit lines of sprite are read. Special case 0: an "extended" sprite (16x16 bits) is read. This special case is [SUPER].
      */
     void DisplaySprite(nibble_t x, nibble_t y, nibble_t height);
-    
+
     //! Skip next instruction if key with number equal to that stored in registers[key] is currently pressed
     inline void SkipIfKey(nibble_t index)
     {
-      if (keyboard.pollKey(registers[index]))
+      if (keys[registers[index]])
       {
         PC+= 2;
       }
     }
+
     //! Skip next instruction if key with number equal to that stored in registers[index] is currently NOT pressed
     inline void SkipIfNotKey(nibble_t index)
     {
-      if (keyboard.pollKey(registers[index]))
+      if (keys[registers[index]])
       {
         PC+= 2;
       }
     }
+
     //! Put current Delay value into registers[index]
     inline void LoadDelayTimer(nibble_t index)
     {
@@ -534,6 +643,16 @@ namespace cpphip8
         registers[i] = memory[INDEX++];
       }
     }
+
+    static const byte_t smallFont[16*5];
+
+    static constexpr byte_t largeFont[16] =
+    {
+      0xDE,
+      0xAD,
+      0xBE,
+      0xEF
+    };
   };
 }
 
