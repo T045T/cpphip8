@@ -550,7 +550,7 @@ namespace cpphip8
     void StoreRegisters(nibble_t index)
     {
       assert(index <= 0xF);
-      for (size_t i = 0; i < index; i++)
+      for (size_t i = 0; i <= index; i++)
       {
         memory[INDEX++] = registers[i];
       }
@@ -560,7 +560,7 @@ namespace cpphip8
     void ReadRegisters(nibble_t index)
     {
       assert(index <= 0xF);
-      for (size_t i = 0; i < index; i++)
+      for (size_t i = 0; i <= index; i++)
       {
         registers[i] = memory[INDEX++];
       }
