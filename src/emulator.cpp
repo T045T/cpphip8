@@ -130,6 +130,7 @@ void Emulator::DisplaySprite(nibble_t x, nibble_t y, nibble_t height)
   byte_t xOffset = xPos % 8;
   xPos /= 8;
   byte_t yPos = registers[y] % currentYRes;
+  bool collision = false;
 
   // Special SUPER case for Extended Sprite (16x16)
   if (height == 0)
@@ -155,17 +156,23 @@ void Emulator::DisplaySprite(nibble_t x, nibble_t y, nibble_t height)
       frameBuffer[right_xPos][(yPos + yOffset) % currentYRes] ^= right_byte;
       if ( tmp_left & left_byte || tmp_right & right_byte)
       {
-        //std::cout << "Collision" << std::endl;
-        registers[RegisterNames::VF] = 1;
-      }
-      else
-      {
-        //std::cout << "NO Collision" << std::endl;
-        registers[RegisterNames::VF] = 0;
+        collision = true;
       }
     }
   }
-//  std::cout << "SPRITE! (" << (unsigned int) xPos << ", " << (unsigned int) yPos << "), height: " << (unsigned int) height << std::endl;
+  
+  if(collision)
+  {
+    // std::cout << "Collision" << std::endl;
+    registers[RegisterNames::VF] = 1;
+    }
+  else
+  {
+    // std::cout << "NO Collision" << std::endl;
+    registers[RegisterNames::VF] = 0;
+  }
+
+  //  std::cout << "SPRITE! (" << (unsigned int) xPos << ", " << (unsigned int) yPos << "), height: " << (unsigned int) height << std::endl;
   std::lock_guard<std::mutex> lock(m);
   screenUpdate = true;
 }
