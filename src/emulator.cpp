@@ -65,6 +65,18 @@ void Emulator::keyUp(uint8_t key)
   keys[key] = false;
 }
 
+void Emulator::tick()
+{
+  if (delayTimer > 0)
+  {
+    delayTimer--;
+  }
+  if (soundTimer > 0)
+  {
+    soundTimer--;
+  }
+}
+
 void Emulator::mainLoop()
 {
   unsigned int counter = 0;
@@ -199,7 +211,7 @@ void Emulator::WaitForKey(nibble_t index)
   new_keypress = 0xFF;
 }
 
-void Emulator::decode(opcode_t opcode)
+OpCodes::OpCode Emulator::decode(opcode_t opcode)
 {
   // Holds the opcode, split into nibbles (from left to right)
   nibble_t nibbles[4];
@@ -216,169 +228,211 @@ void Emulator::decode(opcode_t opcode)
   if ((opcode & OpCodeMasks::ScrollDown) == OpCodes::ScrollDown)
   {
     ScrollDown(nibbles[3]);
+    return OpCodes::ScrollDown;
   }
   else if ((opcode & OpCodeMasks::ClearScreen) == OpCodes::ClearScreen)
   {
     ClearScreen();
+    return OpCodes::ClearScreen;
   }
   else if ((opcode & OpCodeMasks::Return) == OpCodes::Return)
   {
     Return();
+    return OpCodes::Return;
   }
   else if ((opcode & OpCodeMasks::ScrollRight) == OpCodes::ScrollRight)
   {
     ScrollRight();
+    return OpCodes::ScrollRight;
   }
   else if ((opcode & OpCodeMasks::ScrollLeft) == OpCodes::ScrollLeft)
   {
     ScrollLeft();
+    return OpCodes::ScrollLeft;
   }
   else if ((opcode & OpCodeMasks::SetLowRes) == OpCodes::SetLowRes)
   {
     SetLowRes();
+    return OpCodes::SetLowRes;
   }
   else if ((opcode & OpCodeMasks::SetHighRes) == OpCodes::SetHighRes)
   {
     SetHighRes();
+    return OpCodes::SetHighRes;
   }
   else if ((opcode & OpCodeMasks::SysCode) == OpCodes::SysCode)
   {
     SysCode(address);
+    return OpCodes::SysCode;
   }
   else if ((opcode & OpCodeMasks::Jump) == OpCodes::Jump)
   {
     Jump(address);
+    return OpCodes::Jump;
   }
   else if ((opcode & OpCodeMasks::Call) == OpCodes::Call)
   {
     Call(address);
+    return OpCodes::Call;
   }
   else if ((opcode & OpCodeMasks::SkipEqualImmediate) == OpCodes::SkipEqualImmediate)
   {
     SkipEqualImmediate(nibbles[1], lowByte);
+    return OpCodes::SkipEqualImmediate;
   }
   else if ((opcode & OpCodeMasks::SkipNotEqualImmediate) == OpCodes::SkipNotEqualImmediate)
   {
     SkipNotEqualImmediate(nibbles[1], lowByte);
+    return OpCodes::SkipNotEqualImmediate;
   }
   else if ((opcode & OpCodeMasks::SkipEqualRegister) == OpCodes::SkipEqualRegister)
   {
     SkipEqualRegister(nibbles[1], nibbles[2]);
+    return OpCodes::SkipEqualRegister;
   }
   else if ((opcode & OpCodeMasks::LoadImmediate) == OpCodes::LoadImmediate)
   {
     LoadImmediate(nibbles[1], lowByte);
+    return OpCodes::LoadImmediate;
   }
   else if ((opcode & OpCodeMasks::AddToRegister) == OpCodes::AddToRegister)
   {
     AddToRegister(nibbles[1], lowByte);
+    return OpCodes::AddToRegister;
   }
   else if ((opcode & OpCodeMasks::LoadRegister) == OpCodes::LoadRegister)
   {
     LoadRegister(nibbles[1], nibbles[2]);
+    return OpCodes::LoadRegister;
   }
   else if ((opcode & OpCodeMasks::OR) == OpCodes::OR)
   {
     OR(nibbles[1], nibbles[2]);
+    return OpCodes::OR;
   }
   else if ((opcode & OpCodeMasks::AND) == OpCodes::AND)
   {
     AND(nibbles[1], nibbles[2]);
+    return OpCodes::AND;
   }
   else if ((opcode & OpCodeMasks::XOR) == OpCodes::XOR)
   {
     XOR(nibbles[1], nibbles[2]);
+    return OpCodes::XOR;
   }
   else if ((opcode & OpCodeMasks::ADD) == OpCodes::ADD)
   {
     ADD(nibbles[1], nibbles[2]);
+    return OpCodes::ADD;
   }
   else if ((opcode & OpCodeMasks::SUB) == OpCodes::SUB)
   {
     SUB(nibbles[1], nibbles[2]);
+    return OpCodes::SUB;
   }
   else if ((opcode & OpCodeMasks::ShiftRight) == OpCodes::ShiftRight)
   {
     ShiftRight(nibbles[1]);
+    return OpCodes::ShiftRight;
   }
   else if ((opcode & OpCodeMasks::ReverseSUB) == OpCodes::ReverseSUB)
   {
     ReverseSUB(nibbles[1], nibbles[2]);
+    return OpCodes::ReverseSUB;
   }
   else if ((opcode & OpCodeMasks::ShiftLeft) == OpCodes::ShiftLeft)
   {
     ShiftLeft(nibbles[1]);
+    return OpCodes::ShiftLeft;
   }
   else if ((opcode & OpCodeMasks::SkipNotEqualRegister) == OpCodes::SkipNotEqualRegister)
   {
     SkipNotEqualRegister(nibbles[1], nibbles[2]);
+    return OpCodes::SkipNotEqualRegister;
   }
   else if ((opcode & OpCodeMasks::LoadI) == OpCodes::LoadI)
   {
     LoadI(address);
+    return OpCodes::LoadI;
   }
   else if ((opcode & OpCodeMasks::JumpOffset) == OpCodes::JumpOffset)
   {
     JumpOffset(address);
+    return OpCodes::JumpOffset;
   }
   else if ((opcode & OpCodeMasks::Random) == OpCodes::Random)
   {
     Random(nibbles[1], lowByte);
+    return OpCodes::Random;
   }
   else if ((opcode & OpCodeMasks::DisplaySprite) == OpCodes::DisplaySprite)
   {
     DisplaySprite(nibbles[1], nibbles[2], nibbles[3]);
+    return OpCodes::DisplaySprite;
   }
   else if ((opcode & OpCodeMasks::SkipIfKey) == OpCodes::SkipIfKey)
   {
 //    std::cout << "hi" << std::endl;
     SkipIfKey(nibbles[1]);
+    return OpCodes::SkipIfKey;
   }
   else if ((opcode & OpCodeMasks::SkipIfNotKey) == OpCodes::SkipIfNotKey)
   {
-//    std::cout << "hey! hello!" << std::endl;
+    //    std::cout << "hey! hello!" << std::endl;
     SkipIfNotKey(nibbles[1]);
+    return OpCodes::SkipIfNotKey;
   }
   else if ((opcode & OpCodeMasks::LoadDelayTimer) == OpCodes::LoadDelayTimer)
   {
     LoadDelayTimer(nibbles[1]);
+    return OpCodes::LoadDelayTimer;
   }
   else if ((opcode & OpCodeMasks::WaitForKey) == OpCodes::WaitForKey)
   {
     WaitForKey(nibbles[1]);
+    return OpCodes::WaitForKey;
   }
   else if ((opcode & OpCodeMasks::SetDelayTimer) == OpCodes::SetDelayTimer)
   {
     SetDelayTimer(nibbles[1]);
+    return OpCodes::SetDelayTimer;
   }
   else if ((opcode & OpCodeMasks::SetSoundTimer) == OpCodes::SetSoundTimer)
   {
     SetSoundTimer(nibbles[1]);
+    return OpCodes::SetSoundTimer;
   }
   else if ((opcode & OpCodeMasks::AddToI) == OpCodes::AddToI)
   {
     AddToI(nibbles[1]);
+    return OpCodes::AddToI;
   }
   else if ((opcode & OpCodeMasks::LoadFont) == OpCodes::LoadFont)
   {
     LoadFont(nibbles[1]);
+    return OpCodes::LoadFont;
   }
   else if ((opcode & OpCodeMasks::LoadBigFont) == OpCodes::LoadBigFont)
   {
     LoadBigFont(nibbles[1]);
+    return OpCodes::LoadBigFont;
   }
   else if ((opcode & OpCodeMasks::StoreBCD) == OpCodes::StoreBCD)
   {
     StoreBCD(nibbles[1]);
+    return OpCodes::StoreBCD;
   }
   else if ((opcode & OpCodeMasks::StoreRegisters) == OpCodes::StoreRegisters)
   {
     StoreRegisters(nibbles[1]);
+    return OpCodes::StoreRegisters;
   }
   else if ((opcode & OpCodeMasks::ReadRegisters) == OpCodes::ReadRegisters)
   {
     ReadRegisters(nibbles[1]);
+    return OpCodes::ReadRegisters;
   }
+  return OpCodes::Invalid;
 }
 
 const Emulator::byte_t Emulator::smallFont[16*5] = 
