@@ -386,6 +386,10 @@ namespace cpphip8
       {
         registers[RegisterNames::VF] = 1;
       }
+      else
+      {
+        registers[RegisterNames::VF] = 0;
+      }
       registers[target] = result;
     }
 
@@ -396,6 +400,10 @@ namespace cpphip8
       if (result > registers[target])
       {
         registers[RegisterNames::VF] = 1;
+      }
+      else
+      {
+        registers[RegisterNames::VF] = 0;
       }
       registers[target] = result;
     }
@@ -414,6 +422,10 @@ namespace cpphip8
       if (registers[target] > registers[source])
       {
         registers[RegisterNames::VF] = 1;
+      }
+      else
+      {
+        registers[RegisterNames::VF] = 0;
       }
     }
 
