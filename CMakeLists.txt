@@ -9,7 +9,9 @@ INCLUDE_DIRECTORIES(
   "include"
   ${SDL2_INCLUDE_DIRS}
   )
-list( APPEND CMAKE_CXX_FLAGS "-std=c++11 ${CMAKE_CXX_FLAGS} -Wall -g")
+SET( CMAKE_CXX_FLAGS 
+  "-std=c++11 ${CMAKE_CXX_FLAGS} -Wall -g"
+)
 
 SET (CPPHIP8_SRCS
   src/emulator.cpp
