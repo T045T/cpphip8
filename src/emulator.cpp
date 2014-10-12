@@ -206,14 +206,14 @@ void Emulator::ScrollLeft()
 
 void Emulator::WaitForKey(nibble_t index)
 {
-  std::cout << "Waiting for key" << std::endl;
+//  std::cout << "Waiting for key" << std::endl;
   std::unique_lock<std::mutex> lock(m);
   while(new_keypress > 0xF)
   {
     cv.wait(lock);
   }
   registers[index] = new_keypress;
-  std::cout << "key pressed: " << (int) new_keypress << std::endl;
+//  std::cout << "key pressed: " << (int) new_keypress << std::endl;
   // set new_keypress to non-key value
   new_keypress = 0xFF;
 }
