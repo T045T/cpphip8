@@ -499,7 +499,7 @@ namespace cpphip8
       registers[index] = delayTimer;
     }
     
-    //! Halt until the key with number equal to registers[index] is pushed
+    //! Halt until a key is pressed, then load that key into the reigster with the given index
     void WaitForKey(nibble_t index);
     
     //! Set Delay timer to value in registers[index]
