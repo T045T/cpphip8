@@ -32,6 +32,8 @@ void Emulator::startEmulation()
 {
   PC = PROGRAM_START;
   alive = true;
+  // Initialize to invalid value, wo waitForKey doesn't trigger
+  new_keypress = 0xFF;
   t = std::thread(&Emulator::mainLoop, this);
 }
 
@@ -39,8 +41,11 @@ void Emulator::stopEmulation()
 {
   {
     std::lock_guard<std::mutex> lock(m);
+    new_keypress = 0;
     alive = false;
   }
+  // Wake up any waiting waitForKey instruction
+  cv.notify_one();
   t.join();
 }
 
@@ -49,6 +54,8 @@ void Emulator::keyDown(uint8_t key)
   // std::cout << "[Backend] Key Down: " << (int) key << std::endl;
   std::lock_guard<std::mutex> lock(m);
   keys[key] = true;
+  new_keypress = key;
+  cv.notify_one();
 }
 
 void Emulator::keyUp(uint8_t key)
@@ -180,11 +187,16 @@ void Emulator::ScrollLeft()
 
 void Emulator::WaitForKey(nibble_t index)
 {
+  std::cout << "Waiting for key" << std::endl;
   std::unique_lock<std::mutex> lock(m);
-  while(keys[registers[index]])
+  while(new_keypress > 0xF)
   {
     cv.wait(lock);
   }
+  registers[index] = new_keypress;
+  std::cout << "key pressed: " << (int) new_keypress << std::endl;
+  // set new_keypress to non-key value
+  new_keypress = 0xFF;
 }
 
 void Emulator::decode(opcode_t opcode)

@@ -247,12 +247,12 @@ namespace cpphip8
     static const uint8_t FONT_BASE = 0;
     static const uint8_t LARGE_FONT_BASE = 80;
     static const address_t PROGRAM_START = 0x200;
-    uint8_t memory[4096];
-    uint8_t registers[17];
-    uint8_t soundTimer;
-    uint8_t delayTimer;
+    byte_t memory[4096];
+    byte_t registers[17];
+    byte_t soundTimer;
+    byte_t delayTimer;
     uint16_t stack[stack_size];
-    uint16_t INDEX;
+    address_t INDEX;
     uint16_t PC;
     uint8_t SP;
     bool BEEP;
@@ -264,6 +264,13 @@ namespace cpphip8
     // Thread stuff
     std::mutex m;
     std::condition_variable cv;
+
+    /**
+     * Used to transport a new key press from the keyDown method to the waitForKey 
+     * method (which is running in a different thread)
+     */
+
+    byte_t new_keypress;
     std::thread t;
     bool alive;
 
