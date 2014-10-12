@@ -1,6 +1,8 @@
 // this is for emacs file handling -*- mode: c++; flycheck-clang-standard-library: "libc++"; flycheck-clang-language-standard: "c++11"; flycheck-clang-include-path: ("../include" "/usr/local/include/SDL2"); indent-tabs-mode: nil -*-
 
 #include "cpphip8/emulator.hpp"
+#include <thread>
+#include <chrono>
 #include "test.h"
 #include "SDL.h"
 
@@ -85,6 +87,7 @@ int main(int argc, char** argv)
       okay = false;
       break;
     }
+    std::this_thread::sleep_for(std::chrono::milliseconds(15));
   }
   
   closeSDL();  
