@@ -475,7 +475,7 @@ namespace cpphip8
     //! Skip next instruction if key with number equal to that stored in registers[index] is currently NOT pressed
     inline void SkipIfNotKey(nibble_t index)
     {
-      if (keys[registers[index]])
+      if (!keys[registers[index]])
       {
         PC+= 2;
       }
