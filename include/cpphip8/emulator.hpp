@@ -151,7 +151,7 @@ namespace cpphip8
     static const uint8_t LARGE_FONT_BASE = 80;
     static const address_t PROGRAM_START = 0x200;
     byte_t memory[4096];
-    byte_t registers[17];
+    byte_t registers[16];
     byte_t soundTimer;
     byte_t delayTimer;
     uint16_t stack[stack_size];
