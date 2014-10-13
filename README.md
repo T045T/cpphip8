@@ -25,4 +25,12 @@ Chip8     => QWERTZ
 |A|0|B|F|    |Y|X|C|V|
 ---------    ---------
 ```
+
+### Controlling the emulation
+|Key | Function |
+| --- | -------- |
+| TAB | Reset the emulator |
+| Space | Pause the emulator |
+| Esc | Exit |
+
 Sorry, internationalization coming later...
