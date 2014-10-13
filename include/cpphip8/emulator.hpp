@@ -13,8 +13,6 @@
 
 #include "SDL.h"
 
-#include "cpphip8/keyboard.hpp"
-#include "cpphip8/screen.hpp"
 #include "cpphip8/opcodes.hpp"
 
 namespace cpphip8

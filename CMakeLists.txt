@@ -15,8 +15,6 @@ SET( CMAKE_CXX_FLAGS
 
 SET (CPPHIP8_SRCS
   src/emulator.cpp
-  src/screen.cpp
-  src/keyboard.cpp
 )
 
 add_library( emu
