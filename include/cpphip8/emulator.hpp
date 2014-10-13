@@ -292,9 +292,13 @@ namespace cpphip8
      */
     inline void Call(address_t target)
     {
-      if (SP < stack_size - 1)
+      if (SP == 0xFF || SP < stack_size - 1)
       {
         SP += 1;
+      }
+      else
+      {
+        std::cout << "call depth exceeded!" << std::endl;
       }
       stack[SP] = PC;
       // Again, don't jump directly to target because PC is incremented in main loop

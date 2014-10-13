@@ -31,8 +31,10 @@ Emulator::Emulator() :
 void Emulator::startEmulation()
 {
   PC = PROGRAM_START;
+  // First push will increment SP (to 0), then save PC
+  SP = 0xFF;
   alive = true;
-  // Initialize to invalid value, wo waitForKey doesn't trigger
+  // Initialize to invalid value, so waitForKey doesn't trigger
   new_keypress = 0xFF;
   t = std::thread(&Emulator::mainLoop, this);
 }
