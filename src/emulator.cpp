@@ -7,6 +7,7 @@
 #include <fstream>
 #include <iostream>
 #include <iomanip>
+#include <bitset>
 
 namespace cpphip8
 {

@@ -7,6 +7,9 @@
 #include <cassert>
 #include <random>
 #include <array>
+#include <condition_variable>
+#include <mutex>
+#include <thread>
 
 #include <iostream>
 #include <iomanip>
