@@ -386,7 +386,7 @@ namespace cpphip8
     inline void ADD(nibble_t target, nibble_t source)
     {
       byte_t result = registers[target] + registers[source];
-      if (result < registers[target])
+      if (registers[source] > 255 - registers[target])
       {
         registers[RegisterNames::VF] = 1;
       }
@@ -401,13 +401,13 @@ namespace cpphip8
     inline void SUB(nibble_t target, nibble_t source)
     {
       byte_t result = registers[target] - registers[source];
-      if (result > registers[target])
+      if (registers[source] > registers[target])
       {
-        registers[RegisterNames::VF] = 1;
+        registers[RegisterNames::VF] = 0;
       }
       else
       {
-        registers[RegisterNames::VF] = 0;
+        registers[RegisterNames::VF] = 1;
       }
       registers[target] = result;
     }
@@ -422,15 +422,16 @@ namespace cpphip8
     //! REVERSE SUBTRACT! registers[target] = registers[source] - registers[target], borrow in VF
     inline void ReverseSUB(nibble_t target, nibble_t source)
     {
-      registers[target] = registers[source] - registers[target];
+      byte_t result = registers[source] - registers[target];
       if (registers[target] > registers[source])
-      {
-        registers[RegisterNames::VF] = 1;
-      }
-      else
       {
         registers[RegisterNames::VF] = 0;
       }
+      else
+      {
+        registers[RegisterNames::VF] = 1;
+      }
+      registers[target] = result;
     }
 
     //! Shift register left, highest bit is shoved into VF
