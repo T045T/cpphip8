@@ -13,7 +13,6 @@ namespace cpphip8
 Emulator::Emulator() : 
   soundTimer(0),
   delayTimer(0),
-  PC(PROGRAM_START),
   SP(0),
   BEEP(false),
   highres(false),
@@ -23,17 +22,38 @@ Emulator::Emulator() :
   soundRequest(false),
   keys()
 {
+  init();
   memset(memory, 0, 4096);
-  ClearScreen();
-  setupFonts();
 }
 
-void Emulator::startEmulation()
+void Emulator::init()
 {
   PC = PROGRAM_START;
   // First push will increment SP (to 0), then save PC
   SP = 0xFF;
+  INDEX = 0;
+  new_keypress = 0xFF;
+
+  soundTimer = 0;
+  delayTimer = 0;
+  BEEP = false;
+
+  highres = false;
+
+  screenUpdate = false;
+  soundRequest = false;
+
+  memset(keys, false, 16);
+  memset(stack, 0, 16);
+  memset(registers, 0, 16);
+  ClearScreen();
+}
+
+void Emulator::startEmulation()
+{
+  init();
   alive = true;
+  paused = false;
   // Initialize to invalid value, so waitForKey doesn't trigger
   new_keypress = 0xFF;
   t = std::thread(&Emulator::mainLoop, this);
@@ -47,8 +67,24 @@ void Emulator::stopEmulation()
     alive = false;
   }
   // Wake up any waiting waitForKey instruction
-  cv.notify_one();
+  key_cv.notify_one();
   t.join();
+  paused = true;
+}
+
+void Emulator::pauseEmulation()
+{
+  std::lock_guard<std::mutex> lock(m);
+  paused = true;
+}
+
+void Emulator::resumeEmulation()
+{
+  {
+    std::lock_guard<std::mutex> lock(m);
+    paused = false;
+  }
+  pause_cv.notify_one();
 }
 
 void Emulator::keyDown(uint8_t key)
@@ -57,7 +93,7 @@ void Emulator::keyDown(uint8_t key)
   std::lock_guard<std::mutex> lock(m);
   keys[key] = true;
   new_keypress = key;
-  cv.notify_one();
+  key_cv.notify_one();
 }
 
 void Emulator::keyUp(uint8_t key)
@@ -84,9 +120,18 @@ void Emulator::mainLoop()
   unsigned int counter = 0;
   while (alive)
   {
-    //std::cout << "@ 0x" << std::hex << (int) PC << ": " << (int) (memory[PC] >> 4) << (int) (memory[PC] & 0xF) << (int) (memory[PC+1] >> 4) << (int) (memory[PC+1] & 0xF);
+    {
+      std::unique_lock<std::mutex> lock(m);
+      while(paused)
+      {
+        pause_cv.wait(lock);
+      }
+    }
+
+    // std::cout << "@ 0x" << std::hex << (int) PC << ": " << (int) (memory[PC] >> 4) << (int) (memory[PC] & 0xF) << (int) (memory[PC+1] >> 4) << (int) (memory[PC+1] & 0xF);
     
-    uint16_t opcode = decode(readOpcode(PC));
+    //uint16_t opcode = 
+    decode(readOpcode(PC));
 
     // std::cout << " opcode: " << std::hex << (int) opcode
     //           << " registers after: ";
@@ -121,6 +166,9 @@ void Emulator::mainLoop()
 
 void Emulator::loadRom(std::string path)
 {
+  // First, clear memory
+  memset(memory, 0, 4096);
+
   std::ifstream file;
   file.open(path, std::ifstream::in);
   INDEX = PROGRAM_START;
@@ -131,19 +179,26 @@ void Emulator::loadRom(std::string path)
     INDEX += 2;
   }
   INDEX = 0;
+
+  // Finally, copy font data
+  setupFonts();
 }
 
 
 void Emulator::DisplaySprite(nibble_t x, nibble_t y, nibble_t height)
 {
-  uint8_t currentYRes = highres ? 64 : 32;
-  uint8_t currentXRes = highres ? 128 : 64;
   byte_t xPos = registers[x];
   byte_t xOffset = xPos % 8;
   xPos /= 8;
-  byte_t yPos = registers[y] % currentYRes;
+
+  // Wrapping
+  xPos = xPos % (getXRes() / 8);
+  byte_t yPos = registers[y] % getYRes();
+  
   bool collision = false;
 
+  // std::cout << std::dec << "Drawing: (" << (int) xPos*8 + xOffset << ", " << (int) yPos << ") " << (int) height << std::endl;
+  
   // Special SUPER case for Extended Sprite (16x16)
   if (height == 0)
   {
@@ -156,19 +211,26 @@ void Emulator::DisplaySprite(nibble_t x, nibble_t y, nibble_t height)
   {
     byte_t left_byte;
     byte_t right_byte;
-    byte_t right_xPos = (xPos + 1) % (currentXRes / 8);
-    for (byte_t yOffset = 0; yOffset < height; yOffset++)
+    byte_t right_xPos = (xPos + 1);
+    for (byte_t yOffset = 0; yOffset < height && yPos + yOffset < getYRes(); yOffset++)
     {
       left_byte = memory[INDEX + yOffset] >> xOffset;
       // if xOffset == 0, right_byte ends up empty and doesn't affect anything in the XOR
       right_byte = memory[INDEX + yOffset] << (8 - xOffset);
-      byte_t tmp_left = frameBuffer[xPos][(yPos + yOffset) % currentYRes];
-      frameBuffer[xPos][(yPos + yOffset) % currentYRes] ^= left_byte;
-      byte_t tmp_right = frameBuffer[right_xPos][(yPos + yOffset) % currentYRes];
-      frameBuffer[right_xPos][(yPos + yOffset) % currentYRes] ^= right_byte;
-      if ( tmp_left & left_byte || tmp_right & right_byte)
+      byte_t tmp_left = frameBuffer[xPos][(yPos + yOffset)];
+      frameBuffer[xPos][(yPos + yOffset)] ^= left_byte;
+      if ( tmp_left & left_byte)
       {
         collision = true;
+      }
+      if (right_xPos < getXRes() / 8)
+      {
+        byte_t tmp_right = frameBuffer[right_xPos][(yPos + yOffset)];
+        frameBuffer[right_xPos][(yPos + yOffset)] ^= right_byte;
+        if (tmp_right & right_byte)
+        {
+          collision = true;
+        }
       }
     }
   }
@@ -218,14 +280,14 @@ void Emulator::ScrollLeft()
 
 void Emulator::WaitForKey(nibble_t index)
 {
-//  std::cout << "Waiting for key" << std::endl;
+  // std::cout << "Waiting for key" << std::endl;
   std::unique_lock<std::mutex> lock(m);
   while(new_keypress > 0xF)
   {
-    cv.wait(lock);
+    key_cv.wait(lock);
   }
   registers[index] = new_keypress;
-//  std::cout << "key pressed: " << (int) new_keypress << std::endl;
+  // std::cout << "key pressed: " << (int) new_keypress << std::endl;
   // set new_keypress to non-key value
   new_keypress = 0xFF;
 }

@@ -29,8 +29,15 @@ namespace cpphip8
     Emulator();
     void startEmulation();
     void stopEmulation();
+    void pauseEmulation();
+    void resumeEmulation();
     OpCodes::OpCode decode(opcode_t opcode);
     void loadRom(std::string path);
+
+    inline bool isPaused()
+    {
+      return paused;
+    }
 
     inline bool isRunning()
     {
@@ -166,7 +173,8 @@ namespace cpphip8
 
     // Thread stuff
     std::mutex m;
-    std::condition_variable cv;
+    std::condition_variable key_cv;
+    std::condition_variable pause_cv;
 
     /**
      * Used to transport a new key press from the keyDown method to the waitForKey 
@@ -176,6 +184,7 @@ namespace cpphip8
     byte_t new_keypress;
     std::thread t;
     bool alive;
+    bool paused;
 
     // Hardware stuff
     //! Set whenever a sprite is drawn or the screen is cleared
@@ -184,6 +193,7 @@ namespace cpphip8
     bool soundRequest;
     bool keys[16];
 
+    void init();
     void mainLoop();
 
     //! Copy the Font data into memory
