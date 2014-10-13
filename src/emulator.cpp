@@ -84,7 +84,17 @@ void Emulator::mainLoop()
   unsigned int counter = 0;
   while (alive)
   {
-    decode(readOpcode(PC));
+    //std::cout << "@ 0x" << std::hex << (int) PC << ": " << (int) (memory[PC] >> 4) << (int) (memory[PC] & 0xF) << (int) (memory[PC+1] >> 4) << (int) (memory[PC+1] & 0xF);
+    
+    uint16_t opcode = decode(readOpcode(PC));
+
+    // std::cout << " opcode: " << std::hex << (int) opcode
+    //           << " registers after: ";
+    // for(unsigned int i = 0; i < 16; i++)
+    // {
+    //   std::cout << "V" << i << "=" << (int) registers[i] << " ";
+    // }
+    // std::cout << std::endl;
     counter++;
     // Increment PC
     PC+= 2;
@@ -94,7 +104,7 @@ void Emulator::mainLoop()
       break;
     }
     // TODO(nberg): Also increment Timers and shit
-    if (counter % 10 == 0)
+    if (counter % 15 == 0)
     {
       std::this_thread::sleep_for(std::chrono::milliseconds(15));
       if (delayTimer > 0)
