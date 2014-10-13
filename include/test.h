@@ -6,8 +6,8 @@
 bool setupSDL();
 void setupKeymap();
 void closeSDL();
-size_t xRes = 800;
-size_t yRes = 600;
+size_t xRes = 960;
+size_t yRes = 480;
 SDL_Window* window = NULL;
 SDL_Renderer* renderer = NULL;
 

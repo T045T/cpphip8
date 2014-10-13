@@ -121,9 +121,6 @@ void Emulator::mainLoop()
 
 void Emulator::loadRom(std::string path)
 {
-  // First, clear memory
-  memset(memory, 0, 4096);
-
   std::ifstream file;
   file.open(path, std::ifstream::in);
   INDEX = PROGRAM_START;
@@ -134,26 +131,19 @@ void Emulator::loadRom(std::string path)
     INDEX += 2;
   }
   INDEX = 0;
-
-  // Finally, copy font data
-  setupFonts();
 }
 
 
 void Emulator::DisplaySprite(nibble_t x, nibble_t y, nibble_t height)
 {
+  uint8_t currentYRes = highres ? 64 : 32;
+  uint8_t currentXRes = highres ? 128 : 64;
   byte_t xPos = registers[x];
   byte_t xOffset = xPos % 8;
   xPos /= 8;
-
-  // Wrapping
-  xPos = xPos % (getXRes() / 8);
-  byte_t yPos = registers[y] % getYRes();
-  
+  byte_t yPos = registers[y] % currentYRes;
   bool collision = false;
 
-  // std::cout << std::dec << "Drawing: (" << (int) xPos*8 + xOffset << ", " << (int) yPos << ") " << (int) height << std::endl;
-  
   // Special SUPER case for Extended Sprite (16x16)
   if (height == 0)
   {
@@ -166,26 +156,19 @@ void Emulator::DisplaySprite(nibble_t x, nibble_t y, nibble_t height)
   {
     byte_t left_byte;
     byte_t right_byte;
-    byte_t right_xPos = (xPos + 1);
-    for (byte_t yOffset = 0; yOffset < height && yPos + yOffset < getYRes(); yOffset++)
+    byte_t right_xPos = (xPos + 1) % (currentXRes / 8);
+    for (byte_t yOffset = 0; yOffset < height; yOffset++)
     {
       left_byte = memory[INDEX + yOffset] >> xOffset;
       // if xOffset == 0, right_byte ends up empty and doesn't affect anything in the XOR
       right_byte = memory[INDEX + yOffset] << (8 - xOffset);
-      byte_t tmp_left = frameBuffer[xPos][(yPos + yOffset)];
-      frameBuffer[xPos][(yPos + yOffset)] ^= left_byte;
-      if ( tmp_left & left_byte)
+      byte_t tmp_left = frameBuffer[xPos][(yPos + yOffset) % currentYRes];
+      frameBuffer[xPos][(yPos + yOffset) % currentYRes] ^= left_byte;
+      byte_t tmp_right = frameBuffer[right_xPos][(yPos + yOffset) % currentYRes];
+      frameBuffer[right_xPos][(yPos + yOffset) % currentYRes] ^= right_byte;
+      if ( tmp_left & left_byte || tmp_right & right_byte)
       {
         collision = true;
-      }
-      if (right_xPos < getXRes() / 8)
-      {
-        byte_t tmp_right = frameBuffer[right_xPos][(yPos + yOffset)];
-        frameBuffer[right_xPos][(yPos + yOffset)] ^= right_byte;
-        if (tmp_right & right_byte)
-        {
-          collision = true;
-        }
       }
     }
   }
