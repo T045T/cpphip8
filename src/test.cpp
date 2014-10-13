@@ -39,8 +39,35 @@ int main(int argc, char** argv)
           emu.stopEmulation();
           break;
         case SDL_KEYDOWN:
-          // std::cout << "[Frontend] Key Down: " << (int) keyMap[e.key.keysym.sym] << std::endl;
-          emu.keyDown(keyMap[e.key.keysym.sym]);
+          switch (e.key.keysym.sym)
+          {
+            case SDLK_SPACE:
+              if (emu.isPaused())
+              {
+                emu.resumeEmulation();
+              }
+              else
+              {
+                emu.pauseEmulation();
+              }
+              break;
+            case SDLK_ESCAPE:
+              okay = false;
+              emu.stopEmulation();
+              break;
+              
+            case SDLK_TAB:
+              emu.stopEmulation();
+              // Re-Load ROM in case it modified important memory (probably totally happens!)
+              emu.loadRom(romPath);
+              emu.startEmulation();
+              break;
+                
+            default:
+                // std::cout << "[Frontend] Key Down: " << (int) keyMap[e.key.keysym.sym] << std::endl;
+                emu.keyDown(keyMap[e.key.keysym.sym]);
+              break;
+          }
           break;
         case SDL_KEYUP:
           // std::cout << "[Frontend] Key Up: " << (int) keyMap[e.key.keysym.sym] << std::endl;
@@ -58,8 +85,8 @@ int main(int argc, char** argv)
       // Draw screen
       SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 0xFF);
 
-      int pixel_width = (xRes / (float) emu.getXRes());
-      int pixel_height = (yRes / (float) emu.getYRes());
+      int pixel_width = xRes / emu.getXRes();
+      int pixel_height = yRes / emu.getYRes();
 
       SDL_Rect pixel = {0, 0, pixel_width, pixel_height};
       for (size_t x = 0; x < emu.getXRes(); x++)
