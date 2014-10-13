@@ -448,7 +448,7 @@ namespace cpphip8
     //! Shift register left, highest bit is shoved into VF
     inline void ShiftLeft(nibble_t index)
     {
-      registers[RegisterNames::VF] = registers[index] & 0x80;
+      registers[RegisterNames::VF] = registers[index] >> 7;
       registers[index] = registers[index] << 1;
     }
 
