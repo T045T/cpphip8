@@ -568,7 +568,7 @@ namespace cpphip8
       assert(index <= 0xF);
       for (size_t i = 0; i <= index; i++)
       {
-        memory[INDEX++] = registers[i];
+        memory[INDEX+i] = registers[i];
       }
     }
 
@@ -578,7 +578,7 @@ namespace cpphip8
       assert(index <= 0xF);
       for (size_t i = 0; i <= index; i++)
       {
-        registers[i] = memory[INDEX++];
+        registers[i] = memory[INDEX+i];
       }
     }
 
