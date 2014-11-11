@@ -32,5 +32,3 @@ Chip8     => QWERTZ
 | TAB | Reset the emulator |
 | Space | Pause the emulator |
 | Esc | Exit |
-
-Sorry, internationalization coming later...
